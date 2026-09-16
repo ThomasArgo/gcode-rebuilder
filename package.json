@@ -1,1 +1,1 @@
-{"name":"gcode-rebuilder","version":"1.0.0","private":true,"type":"module","scripts":{"test":"node tests/engine.test.mjs","check":"node --check engine.js && node --check worker.js && node --check app.js"}}
+{"name":"gcode-rebuilder","version":"1.0.0","private":true,"type":"module","scripts":{"test":"node tests/engine.test.mjs","check":"node --check engine.js && node --check worker.js && node --check app.js","test:layout":"node tests/layout.test.mjs"}}
