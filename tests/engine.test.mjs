@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import { reconstructGcode, sampleGcode } from '../engine.js';
+import { binaryStl } from '../exporter.js';
+const rebuild = source => reconstructGcode(source, { width:.45, height:.2, includeInfill:true, ignoreSkirt:false, ignoreBrim:false, ignoreSupports:false });
+let result = rebuild(sampleGcode()); assert.equal(result.stats.layers, 2); assert.ok(result.meshLayers.every(layer => layer.vertices.length > 0));
+result = rebuild('G90\nM82\nG1 X0 Y0 Z.2\nG1 X10 E1\nG92 E0\nG1 X20 E1\n'); assert.equal(result.stats.extrusionDistance, 20);
+result = rebuild('G91\nM83\nG1 Z.2\nG1 X5 E.3\nG1 X5 E-.8\nG1 X5 E.3\n'); assert.equal(result.stats.retractions, 1); assert.ok(result.stats.travelDistance >= 5);
+result = rebuild('G90\nG1 Z.2\nG1 X0 Y0\nG1 X10 E1\nT1\nG1 X20 E1\nG2 X30 Y10 I0 J10 E2\n'); assert.equal(result.stats.toolChanges, 1); assert.ok(result.meshLayers[0].vertices.length > 36);
+result = rebuild(';TYPE:SUPPORT\nG90\nG1 Z.2\nG1 X-10 Y-10\nG1 X10 E1\n'); assert.equal(result.stats.layers, 1); assert.ok(result.stats.min.x < 0);
+result = rebuild('G28\nM900 K.05\nG1 X0 Y0 Z.2\nG1 X10 E1\n'); assert.ok(result.stats.warnings.some(item => item.startsWith('G28')));
+console.log('engine tests passed');
+const bytes = binaryStl(Array.from(rebuild(sampleGcode()).meshLayers[0].vertices)); const view = new DataView(bytes); assert.equal(view.byteLength, 84 + view.getUint32(80, true) * 50); assert.ok(view.getUint32(80, true) > 0); console.log('binary STL test passed');
