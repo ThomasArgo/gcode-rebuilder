@@ -2,6 +2,8 @@
 
 GCode Rebuilder is a privacy-first, browser-based utility that reconstructs FDM extrusion paths as a practical STL mesh. It processes files locally—no G-code is uploaded or persisted.
 
+![GCode Rebuilder workspace](docs-preview.png)
+
 ## Features
 
 - Drag-and-drop `.gcode`, `.gco`, and plain-text G-code.
