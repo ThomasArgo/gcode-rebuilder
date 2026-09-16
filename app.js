@@ -5,13 +5,13 @@ import { binaryStl as encodeBinaryStl, asciiStl } from './exporter.js';
 
 const $ = selector => document.querySelector(selector);
 const state = { source: '', filename: 'model', result: null, worker: null, orthographic: false, wireframe: false };
-const scene = new THREE.Scene(); scene.background = new THREE.Color('#102f38');
+const scene = new THREE.Scene(); scene.background = new THREE.Color('#0b171c');
 const perspective = new THREE.PerspectiveCamera(42, 1, .1, 2000), orthographic = new THREE.OrthographicCamera(-100,100,100,-100,.1,2000);
 let camera = perspective, mesh = null;
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); $('#viewer').append(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true;
-scene.add(new THREE.HemisphereLight('#dffefa','#17343c', 2.2)); const light = new THREE.DirectionalLight('#fff', 2); light.position.set(60,80,90); scene.add(light);
-const grid = new THREE.GridHelper(220, 22, '#4d8a87', '#244d53'); scene.add(grid);
+scene.add(new THREE.HemisphereLight('#e8f0f2','#071014', 2.1)); const light = new THREE.DirectionalLight('#fff', 2); light.position.set(60,80,90); scene.add(light);
+const grid = new THREE.GridHelper(220, 22, '#42585e', '#1a2c31'); scene.add(grid);
 function resize(){const box=$('#viewer').getBoundingClientRect(); renderer.setSize(box.width,box.height); camera.aspect=box.width/box.height; if(camera.isPerspectiveCamera) camera.updateProjectionMatrix(); else {const s=Math.max(box.width,box.height)/5; camera.left=-s;camera.right=s;camera.top=s;camera.bottom=-s;camera.updateProjectionMatrix()} renderer.render(scene,camera)}
 new ResizeObserver(resize).observe($('#viewer')); function animate(){requestAnimationFrame(animate);controls.update();renderer.render(scene,camera)} animate();
 function formSettings(){const data=new FormData($('#settings')); return {width:Number(data.get('width')),height:Number(data.get('height')),arcResolution:Number(data.get('arcResolution')),includeInfill:data.has('includeInfill'),ignoreSkirt:data.has('ignoreSkirt'),ignoreBrim:data.has('ignoreSkirt'),ignoreSupports:data.has('ignoreSupports')};}
