@@ -23,8 +23,8 @@ try {
   const page = await browser.newPage();
   for (const [width, height] of sizes) {
     await page.setViewportSize({ width, height }); await page.goto(baseUrl, { waitUntil:'networkidle' });
-    const check = await page.evaluate(() => { const viewer = document.querySelector('#viewer'), canvas = viewer.querySelector('canvas'), box = viewer.getBoundingClientRect(), canvasBox = canvas.getBoundingClientRect(); return { pageFits:document.documentElement.scrollWidth <= document.documentElement.clientWidth, canvasFits:canvasBox.width <= box.width + 1 && canvasBox.height <= box.height + 1, width:box.width, height:box.height }; });
-    if (!check.pageFits || !check.canvasFits || !check.width || !check.height) throw new Error(`${width}x${height}: ${JSON.stringify(check)}`);
+    const check = await page.evaluate(() => { const viewer = document.querySelector('#viewer'), canvas = viewer.querySelector('canvas'), box = viewer.getBoundingClientRect(), canvasBox = canvas.getBoundingClientRect(); return { pageFits:document.documentElement.scrollWidth <= document.documentElement.clientWidth, canvasFits:canvasBox.width <= box.width + 1 && canvasBox.height <= box.height + 1, status:document.querySelector('.status-message')?.textContent.trim(), sourceLink:[...document.links].some(link => /github\.com\/ThomasArgo\/gcode-rebuilder/.test(link.href)), width:box.width, height:box.height }; });
+    if (!check.pageFits || !check.canvasFits || !check.width || !check.height || check.status !== 'Load a G-code file to begin.' || check.sourceLink) throw new Error(`${width}x${height}: ${JSON.stringify(check)}`);
   }
   await page.setViewportSize({ width:1440, height:900 }); await page.goto(baseUrl, { waitUntil:'networkidle' }); await page.setViewportSize({ width:320, height:568 }); await page.setViewportSize({ width:1440, height:900 });
   const resized = await page.evaluate(() => { const viewer = document.querySelector('#viewer'), canvas = viewer.querySelector('canvas'); return document.documentElement.scrollWidth <= document.documentElement.clientWidth && canvas.getBoundingClientRect().width <= viewer.getBoundingClientRect().width + 1; });
