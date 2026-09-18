@@ -9,7 +9,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline:2px so
 
 .app-header { min-width:0; min-height:64px; display:flex; align-items:center; gap:clamp(8px,1.7vw,22px); padding:0 clamp(14px,2vw,24px); border-bottom:1px solid var(--line); background:#0a1519; box-shadow:0 4px 20px rgba(0,0,0,.16); }
 .brand { min-width:0; display:flex; align-items:center; gap:10px; color:var(--text); font-size:16px; text-decoration:none; letter-spacing:-.025em; white-space:nowrap; }
-.brand span { flex:0 0 auto; display:grid; place-items:center; width:30px; height:30px; border-radius:7px; background:var(--orange); color:#170b03; font:800 10px 'DM Mono',monospace; letter-spacing:0; box-shadow:0 4px 14px rgba(255,106,0,.22); }
+.brand-logo { flex:0 0 auto; width:38px; height:38px; object-fit:contain; border-radius:6px; background:#fff; }
 .header-status { min-width:0; display:flex; align-items:center; gap:8px; color:var(--secondary); font-size:12px; white-space:nowrap; }
 .header-status i, .status-dot { flex:0 0 auto; display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--mint); box-shadow:0 0 0 4px rgba(104,216,197,.1); }
 .header-status small { overflow:hidden; color:var(--muted); font-size:12px; text-overflow:ellipsis; }
@@ -65,7 +65,11 @@ fieldset input { flex:0 0 auto; width:14px; height:14px; margin:0; accent-color:
 .tool-controls button:hover { color:var(--text); }
 .tool-controls button[aria-pressed=true] { border-color:rgba(255,106,0,.7); background:rgba(255,106,0,.12); color:#ff9c5c; }
 #viewer { position:relative; min-width:0; min-height:0; width:100%; height:100%; background:radial-gradient(circle at 50% 34%,rgba(30,76,87,.18),transparent 48%),var(--viewer); }
-#viewer canvas { display:block; width:100%!important; height:100%!important; max-width:100%; }
+#viewer canvas { position:relative; z-index:1; display:block; width:100%!important; height:100%!important; max-width:100%; }
+.viewer-empty { position:absolute; z-index:2; inset:0; display:grid; place-items:center; align-content:center; gap:12px; padding:24px; color:var(--secondary); text-align:center; pointer-events:none; }
+.viewer-empty[hidden] { display:none; }
+.viewer-empty img { width:88px; height:88px; object-fit:contain; border-radius:8px; background:#fff; box-shadow:0 12px 32px rgba(0,0,0,.22); }
+.viewer-empty p { max-width:250px; margin:0; font-size:13px; line-height:1.5; }
 .layer-controls { display:grid; grid-template-columns:auto minmax(0,max-content) minmax(80px,1fr) minmax(0,max-content); align-items:center; gap:11px; min-width:0; padding:12px 16px; border-top:1px solid var(--line); background:#0d1a1f; }
 .layer-controls .rail-label { margin:0; color:var(--secondary); font-size:10px; }
 .layer-controls label { min-width:0; }
@@ -77,6 +81,7 @@ output { min-width:0; overflow:hidden; color:var(--secondary); font:11px 'DM Mon
 .inspector dl div { min-width:0; padding:10px 4px; border-bottom:1px solid var(--line); }
 dt { color:var(--muted); font-size:11px; }
 dd { overflow:hidden; min-width:0; margin:3px 0 0; color:var(--text); font:600 12px 'DM Mono',monospace; text-overflow:ellipsis; white-space:nowrap; }
+dd.status-message { overflow:visible; font-family:Manrope, Inter, Arial, sans-serif; line-height:1.45; text-overflow:clip; white-space:normal; overflow-wrap:anywhere; }
 .inspector details { min-width:0; border:1px solid var(--line); border-radius:7px; background:#0d1a1f; }
 .inspector summary { display:flex; justify-content:space-between; gap:10px; padding:10px 11px; color:var(--secondary); font-size:12px; font-weight:700; cursor:pointer; }
 .inspector summary span { color:var(--warning); }
@@ -109,6 +114,7 @@ footer span { min-width:0; }
 @media (max-width:599px) {
   .app-header { min-height:58px; gap:10px; padding:0 14px; }
   .brand { font-size:14px; }
+  .brand-logo { width:34px; height:34px; }
   .header-status { margin-left:auto; }
   .header-status small, .app-header nav a:last-child { display:none; }
   .app-header nav { margin-left:0; }
