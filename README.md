@@ -13,6 +13,12 @@ GCode Rebuilder is a privacy-first, browser-based utility that reconstructs FDM 
 - Closed deposited-bead triangles, real-time Three.js preview, orbit/pan/zoom, wireframe, orthographic view, and layer filtering.
 - Binary STL, ASCII STL, and JSON report download.
 
+## Included 3DBenchy sample
+
+`samples/3dbenchy-sample.gcode` is a bundled, pre-sliced reconstruction demo of the official Creative Tools [single-part 3DBenchy](https://github.com/CreativeTools/3DBenchy/tree/master/Single-part). The original model is CC0/public domain as of 2025. The demonstration slice uses a 0.4 mm nozzle, 0.2 mm layers, one material, standard orientation, no supports, and no startup purge, skirt, or brim deposition. It is sourced from a Creality-maintained Benchy slice and sanitized with `scripts/sanitize-benchy-sample.mjs` to retain only reconstruction-relevant commands.
+
+The bundled G-code is for browser testing only. It omits printer startup and shutdown sequences and must not be sent directly to a physical printer.
+
 ## Important limitation
 
 This rebuild is based on the instructions and extrusion paths left after slicing. It cannot recover the original, pre-sliced STL exactly, and it does not emulate every printer's material behavior. It is best for inspecting a practical deposited-path representation.

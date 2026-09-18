@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
-import { reconstructGcode, sampleGcode } from '../engine.js';
+import { reconstructGcode } from '../engine.js';
 import { readFile } from 'node:fs/promises';
 import { binaryStl, asciiStl } from '../exporter.js';
 const rebuild = source => reconstructGcode(source, { width:.45, height:.2, includeInfill:true, ignoreSkirt:false, ignoreBrim:false, ignoreSupports:false });
-let result = rebuild(sampleGcode()); assert.equal(result.stats.layers, 2); assert.ok(result.meshLayers.every(layer => layer.vertices.length > 0));
+const benchySample = await readFile(new URL('../samples/3dbenchy-sample.gcode', import.meta.url), 'utf8');
+let result = rebuild(benchySample); assert.ok(result.stats.layers > 150); assert.equal(result.stats.startupPurgeSegments, 0); assert.ok(result.meshLayers.every(layer => layer.vertices.length > 0)); assert.ok(result.stats.max.x-result.stats.min.x > 55 && result.stats.max.x-result.stats.min.x < 65); assert.ok(result.stats.max.y-result.stats.min.y > 28 && result.stats.max.y-result.stats.min.y < 34); assert.ok(result.stats.max.z-result.stats.min.z > 45 && result.stats.max.z-result.stats.min.z < 50);
 result = rebuild('G90\nM82\nG1 X0 Y0 Z.2\nG1 X10 E1\nG92 E0\nG1 X20 E1\n'); assert.equal(result.stats.extrusionDistance, 20);
 result = rebuild('G91\nM83\nG1 Z.2\nG1 X5 E.3\nG1 X5 E-.8\nG1 X5 E.3\n'); assert.equal(result.stats.retractions, 1); assert.ok(result.stats.travelDistance >= 5);
 result = rebuild('G90\nG1 Z.2\nG1 X0 Y0\nG1 X10 E1\nT1\nG1 X20 E1\nG2 X30 Y10 I0 J10 E2\n'); assert.equal(result.stats.toolChanges, 1); assert.ok(result.meshLayers[0].vertices.length > 36);
@@ -50,4 +51,4 @@ assert.equal(binaryStl(filteredFlashVertices).byteLength < binaryStl(includedFla
 assert.equal(asciiStl('flash-filtered', filteredFlashVertices).includes(' -1.225000023841858'), false);
 assert.equal(asciiStl('flash-included', includedFlashVertices).includes(' -1.225000023841858'), true);
 console.log('engine tests passed');
-const bytes = binaryStl(Array.from(rebuild(sampleGcode()).meshLayers[0].vertices)); const view = new DataView(bytes); assert.equal(view.byteLength, 84 + view.getUint32(80, true) * 50); assert.ok(view.getUint32(80, true) > 0); console.log('binary STL test passed');
+const bytes = binaryStl(Array.from(rebuild(benchySample).meshLayers[0].vertices)); const view = new DataView(bytes); assert.equal(view.byteLength, 84 + view.getUint32(80, true) * 50); assert.ok(view.getUint32(80, true) > 0); console.log('binary STL test passed');

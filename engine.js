@@ -126,5 +126,3 @@ export function reconstructGcode(source, options = {}, progress = () => {}) {
   stats.layers = meshLayers.length; stats.warnings = warnings.slice(0, 100); stats.speedMin = Number.isFinite(stats.speedMin) ? stats.speedMin : 0;
   return { meshLayers, stats };
 }
-
-export function sampleGcode() { return `; GCode Rebuilder sample\n; generated with GCode Rebuilder\n; LAYER_HEIGHT:0.20\n; NOZZLE_DIAMETER:0.40\nG90\nM82\nG92 E0\n;LAYER:0\nG1 Z0.20 F1200\n;TYPE:WALL-OUTER\nG1 X10 Y10 F1800\nG1 X40 Y10 E1.2\nG1 X40 Y40 E2.4\nG1 X10 Y40 E3.6\nG1 X10 Y10 E4.8\n;LAYER:1\nG1 Z0.40 F1200\nG1 X12 Y12 F1800\nG1 X38 Y12 E5.9\nG1 X38 Y38 E7.0\nG1 X12 Y38 E8.1\nG1 X12 Y12 E9.2\n`; }

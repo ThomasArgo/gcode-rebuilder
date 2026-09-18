@@ -40,5 +40,13 @@ try {
   await page.waitForFunction(() => document.querySelector('#viewer-state')?.textContent === 'Startup purge line detected and included.');
   const flashIncludedBounds = await page.locator('#stats').textContent();
   assert.match(flashIncludedBounds, /50\.0, -1\.4, 0\.3/);
+  await page.locator('#sample').click();
+  await page.waitForFunction(() => document.querySelector('#viewer-state')?.textContent?.startsWith('Benchy sample rebuilt ('), null, { timeout:30000 });
+  assert.match(await page.locator('#file-note').textContent(), /3DBenchy-sample\.gcode/);
+  assert.match(await page.locator('#stats').textContent(), /59\.5 × 30\.6 × 47\.8 mm/);
+  for (const selector of ['#layer','#layer-mode','#export-binary','#export-ascii','#export-json']) assert.equal(await page.locator(selector).isDisabled(), false);
+  await page.locator('input[name="ignoreStartupPurge"]').check();
+  await page.locator('#file').setInputFiles(fixture);
+  await page.waitForFunction(() => document.querySelector('#viewer-state')?.textContent === 'Startup purge line detected: 2 segments excluded.');
   console.log('purge toggle browser test passed');
 } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
