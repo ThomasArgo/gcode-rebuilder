@@ -42,14 +42,21 @@ export function reconstructGcode(source, options = {}, progress = () => {}) {
   const settings = { width: .45, height: .2, arcResolution: 24, includeInfill: true, ignoreSkirt: true, ignoreBrim: true, ignoreSupports: true, ignoreStartupPurge: true, ...options };
   let absolute = true, absoluteExtrusion = true, tool = 0, feature = 'UNKNOWN', modelStarted = false, modelMarkerSeen = false, resetEpoch = 0;
   const pos = { x: 0, y: 0, z: 0 }, extrusion = new Map([[0, 0]]), layers = new Map(), pendingStartup = [];
-  const warnings = [], stats = { commands: 0, extrusionDistance: 0, travelDistance: 0, retractions: 0, toolChanges: 0, filamentMm: 0, startupPurgeSegments: 0, startupPurgeExcluded: 0, min: { x: Infinity, y: Infinity, z: Infinity }, max: { x: -Infinity, y: -Infinity, z: -Infinity }, slicer: 'Unknown', flavor: 'Unknown', nozzle: null, layerHeight: null, printTime: null, speedMin: Infinity, speedMax: 0 };
+  const warnings = [], stats = { commands: 0, extrusionDistance: 0, travelDistance: 0, retractions: 0, toolChanges: 0, filamentMm: 0, startupPurgeSegments: 0, startupPurgeExcluded: 0, startupPurge: { detected: false, excluded: false, segments: [], firstModelExtrusionLine: null }, min: { x: Infinity, y: Infinity, z: Infinity }, max: { x: -Infinity, y: -Infinity, z: -Infinity }, slicer: 'Unknown', flavor: 'Unknown', nozzle: null, layerHeight: null, printTime: null, speedMin: Infinity, speedMax: 0 };
   const updateBounds = point => ['x','y','z'].forEach(axis => { stats.min[axis] = Math.min(stats.min[axis], point[axis]); stats.max[axis] = Math.max(stats.max[axis], point[axis]); });
   const shouldSkip = () => (settings.ignoreSkirt && /SKIRT/i.test(feature)) || (settings.ignoreBrim && /BRIM/i.test(feature)) || (settings.ignoreSupports && /SUPPORT/i.test(feature)) || (!settings.includeInfill && /INFILL/i.test(feature));
-  const appendRecord = (record, classification = record.feature) => {
-    if (classification === 'startup-purge') { stats.startupPurgeSegments++; if (settings.ignoreStartupPurge) { stats.startupPurgeExcluded++; return; } }
+  const appendRecord = (record, classification = record.feature, reason = null) => {
+    record.classification = classification;
+    if (classification === 'startup-purge') {
+      stats.startupPurgeSegments++;
+      stats.startupPurge.detected = true;
+      stats.startupPurge.excluded = settings.ignoreStartupPurge;
+      stats.startupPurge.segments.push({ line: record.line, command: record.command, start: record.start, end: record.next, extrusionDelta: record.eDelta, layer: record.layer, feature: record.feature, positioningMode: record.positioningMode, extrusionMode: record.extrusionMode, tool: record.tool, startup: record.startup, classification, reason });
+      if (settings.ignoreStartupPurge) { stats.startupPurgeExcluded++; return; }
+    } else if (stats.startupPurge.firstModelExtrusionLine === null) stats.startupPurge.firstModelExtrusionLine = record.line;
     const layerZ = Number(record.next.z.toFixed(4)); if (!layers.has(layerZ)) layers.set(layerZ, []);
     let previous = record.start;
-    for (const point of record.points) { layers.get(layerZ).push({ a: previous, b: point, tool: record.tool, feature: classification, feed: record.feed || 0 }); previous = point; }
+    for (const point of record.points) { layers.get(layerZ).push({ a: previous, b: point, tool: record.tool, feature: classification, feed: record.feed || 0, source: record }); previous = point; }
     stats.extrusionDistance += record.distance; stats.filamentMm += record.eDelta; updateBounds(record.start); updateBounds(record.next);
   };
   const flushStartup = explicit => {
@@ -63,7 +70,10 @@ export function reconstructGcode(source, options = {}, progress = () => {}) {
       if (first.resetEpoch > 0 && first.distance >= 40 && straight && outside) fallbackIndex = 0;
       else if (first.resetEpoch > 0 && first.distance >= 40 && straight) warnings.push('Startup purge detection was inconclusive; preserved early extrusion.');
     }
-    pendingStartup.forEach((record, index) => appendRecord(record, explicit || index === fallbackIndex ? 'startup-purge' : record.feature));
+    pendingStartup.forEach((record, index) => {
+      const classified = explicit || index === fallbackIndex;
+      appendRecord(record, classified ? 'startup-purge' : record.feature, classified ? (explicit ? 'startup extrusion before first layer/object marker' : 'detached, long, straight extrusion before model geometry') : null);
+    });
     pendingStartup.length = 0;
   };
   for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
@@ -71,8 +81,9 @@ export function reconstructGcode(source, options = {}, progress = () => {}) {
     const commandPart = raw.split(';')[0].trim().toUpperCase();
     if (comment) {
       const match = comment.match(/(?:TYPE|FEATURE)\s*:\s*(.+)/i); if (match) feature = match[1].trim();
-      if (/(?:^|\s)(?:LAYER\s*:\s*0|LAYER_CHANGE|MESH\s*:|TYPE\s*:|FEATURE\s*:|Z\s*:)/i.test(comment) && !modelStarted) { modelStarted = true; modelMarkerSeen = true; flushStartup(true); }
-      const slicer = comment.match(/(?:GENERATED WITH|SLICER)\s*[:=]?\s*(.+)/i); if (slicer) stats.slicer = slicer[1].trim();
+      /* A feature label is not a model boundary: Creality Print emits ;TYPE:Custom before its startup purge lines. */
+      if (/(?:^|\s)(?:LAYER\s*:\s*0|LAYER_CHANGE|MESH\s*:|OBJECT_ID\s*:|PRINTING\s+OBJECT)/i.test(comment) && !modelStarted) { modelStarted = true; modelMarkerSeen = true; flushStartup(true); }
+      const slicer = comment.match(/(?:GENERATED\s+BY|GENERATED WITH|SLICER)\s*[:=]?\s*(.+)/i); if (slicer) stats.slicer = slicer[1].trim();
       const layerHeight = comment.match(/LAYER_HEIGHT\s*[:=]\s*([\d.]+)/i); if (layerHeight) stats.layerHeight = Number(layerHeight[1]);
       const nozzle = comment.match(/NOZZLE_DIAMETER\s*[:=]\s*([\d.]+)/i); if (nozzle) stats.nozzle = Number(nozzle[1]);
       const time = comment.match(/TIME\s*[:=]\s*(\d+)/i); if (time) stats.printTime = Number(time[1]);
@@ -97,7 +108,7 @@ export function reconstructGcode(source, options = {}, progress = () => {}) {
     if (eDelta < -.00001) stats.retractions++;
     if (isExtruding) {
       const points = /^G[23]/.test(command) ? arcPoints(start, next, number(tokens,'I'), number(tokens,'J'), /^G2/.test(command), settings.arcResolution) : [next];
-      const record = { start, next, points, tool, feature, feed, distance, eDelta, resetEpoch, command };
+      const record = { line: lineIndex + 1, source: raw, start, next, points, tool, feature, feed, distance, eDelta, resetEpoch, command, layer: Number(next.z.toFixed(4)), positioningMode: absolute ? 'absolute' : 'relative', extrusionMode: absoluteExtrusion ? 'absolute' : 'relative', startup: !modelStarted };
       if (modelStarted) appendRecord(record); else pendingStartup.push(record);
     } else stats.travelDistance += distance;
     Object.assign(pos, next);
