@@ -39,17 +39,39 @@ function addBead(target, a, b, width, height) {
 
 export function reconstructGcode(source, options = {}, progress = () => {}) {
   const lines = source.replace(/\r/g, '').split('\n');
-  const settings = { width: .45, height: .2, arcResolution: 24, includeInfill: true, ignoreSkirt: true, ignoreBrim: true, ignoreSupports: true, ...options };
-  let absolute = true, absoluteExtrusion = true, tool = 0, feature = 'UNKNOWN';
-  const pos = { x: 0, y: 0, z: 0 }, extrusion = new Map([[0, 0]]), layers = new Map();
-  const warnings = [], stats = { commands: 0, extrusionDistance: 0, travelDistance: 0, retractions: 0, toolChanges: 0, filamentMm: 0, min: { x: Infinity, y: Infinity, z: Infinity }, max: { x: -Infinity, y: -Infinity, z: -Infinity }, slicer: 'Unknown', flavor: 'Unknown', nozzle: null, layerHeight: null, printTime: null, speedMin: Infinity, speedMax: 0 };
+  const settings = { width: .45, height: .2, arcResolution: 24, includeInfill: true, ignoreSkirt: true, ignoreBrim: true, ignoreSupports: true, ignoreStartupPurge: true, ...options };
+  let absolute = true, absoluteExtrusion = true, tool = 0, feature = 'UNKNOWN', modelStarted = false, modelMarkerSeen = false, resetEpoch = 0;
+  const pos = { x: 0, y: 0, z: 0 }, extrusion = new Map([[0, 0]]), layers = new Map(), pendingStartup = [];
+  const warnings = [], stats = { commands: 0, extrusionDistance: 0, travelDistance: 0, retractions: 0, toolChanges: 0, filamentMm: 0, startupPurgeSegments: 0, startupPurgeExcluded: 0, min: { x: Infinity, y: Infinity, z: Infinity }, max: { x: -Infinity, y: -Infinity, z: -Infinity }, slicer: 'Unknown', flavor: 'Unknown', nozzle: null, layerHeight: null, printTime: null, speedMin: Infinity, speedMax: 0 };
   const updateBounds = point => ['x','y','z'].forEach(axis => { stats.min[axis] = Math.min(stats.min[axis], point[axis]); stats.max[axis] = Math.max(stats.max[axis], point[axis]); });
   const shouldSkip = () => (settings.ignoreSkirt && /SKIRT/i.test(feature)) || (settings.ignoreBrim && /BRIM/i.test(feature)) || (settings.ignoreSupports && /SUPPORT/i.test(feature)) || (!settings.includeInfill && /INFILL/i.test(feature));
+  const appendRecord = (record, classification = record.feature) => {
+    if (classification === 'startup-purge') { stats.startupPurgeSegments++; if (settings.ignoreStartupPurge) { stats.startupPurgeExcluded++; return; } }
+    const layerZ = Number(record.next.z.toFixed(4)); if (!layers.has(layerZ)) layers.set(layerZ, []);
+    let previous = record.start;
+    for (const point of record.points) { layers.get(layerZ).push({ a: previous, b: point, tool: record.tool, feature: classification, feed: record.feed || 0 }); previous = point; }
+    stats.extrusionDistance += record.distance; stats.filamentMm += record.eDelta; updateBounds(record.start); updateBounds(record.next);
+  };
+  const flushStartup = explicit => {
+    if (!pendingStartup.length) return;
+    let fallbackIndex = -1;
+    if (!explicit && pendingStartup.length >= 4) {
+      const first = pendingStartup[0], remainder = pendingStartup.slice(1), bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+      for (const record of remainder) for (const point of [record.start, record.next]) { bounds.minX = Math.min(bounds.minX, point.x); bounds.minY = Math.min(bounds.minY, point.y); bounds.maxX = Math.max(bounds.maxX, point.x); bounds.maxY = Math.max(bounds.maxY, point.y); }
+      const dx = Math.abs(first.next.x - first.start.x), dy = Math.abs(first.next.y - first.start.y), straight = Math.min(dx, dy) <= Math.max(dx, dy) * .08;
+      const gap = Math.max(settings.width * 4, 2), outside = Math.max(first.start.x, first.next.x) < bounds.minX - gap || Math.min(first.start.x, first.next.x) > bounds.maxX + gap || Math.max(first.start.y, first.next.y) < bounds.minY - gap || Math.min(first.start.y, first.next.y) > bounds.maxY + gap;
+      if (first.resetEpoch > 0 && first.distance >= 40 && straight && outside) fallbackIndex = 0;
+      else if (first.resetEpoch > 0 && first.distance >= 40 && straight) warnings.push('Startup purge detection was inconclusive; preserved early extrusion.');
+    }
+    pendingStartup.forEach((record, index) => appendRecord(record, explicit || index === fallbackIndex ? 'startup-purge' : record.feature));
+    pendingStartup.length = 0;
+  };
   for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
     const raw = lines[lineIndex], comment = raw.includes(';') ? raw.slice(raw.indexOf(';') + 1).trim() : '';
     const commandPart = raw.split(';')[0].trim().toUpperCase();
     if (comment) {
       const match = comment.match(/(?:TYPE|FEATURE)\s*:\s*(.+)/i); if (match) feature = match[1].trim();
+      if (/(?:^|\s)(?:LAYER\s*:\s*0|LAYER_CHANGE|MESH\s*:|TYPE\s*:|FEATURE\s*:|Z\s*:)/i.test(comment) && !modelStarted) { modelStarted = true; modelMarkerSeen = true; flushStartup(true); }
       const slicer = comment.match(/(?:GENERATED WITH|SLICER)\s*[:=]?\s*(.+)/i); if (slicer) stats.slicer = slicer[1].trim();
       const layerHeight = comment.match(/LAYER_HEIGHT\s*[:=]\s*([\d.]+)/i); if (layerHeight) stats.layerHeight = Number(layerHeight[1]);
       const nozzle = comment.match(/NOZZLE_DIAMETER\s*[:=]\s*([\d.]+)/i); if (nozzle) stats.nozzle = Number(nozzle[1]);
@@ -62,7 +84,7 @@ export function reconstructGcode(source, options = {}, progress = () => {}) {
     if (command === 'M82') { absoluteExtrusion = true; continue; }
     if (command === 'M83') { absoluteExtrusion = false; continue; }
     if (/^T\d+$/.test(command)) { tool = Number(command.slice(1)); if (!extrusion.has(tool)) extrusion.set(tool, 0); stats.toolChanges++; continue; }
-    if (command === 'G92') { for (const axis of ['X','Y','Z']) { const value = number(tokens, axis); if (value !== undefined) pos[axis.toLowerCase()] = value; } const e = number(tokens, 'E'); if (e !== undefined) extrusion.set(tool, e); continue; }
+    if (command === 'G92') { for (const axis of ['X','Y','Z']) { const value = number(tokens, axis); if (value !== undefined) pos[axis.toLowerCase()] = value; } const e = number(tokens, 'E'); if (e !== undefined) { extrusion.set(tool, e); resetEpoch++; } continue; }
     if (!['G0','G00','G1','G01','G2','G02','G3','G03'].includes(command)) { if (/^[A-Z]/.test(command) && !['M104','M109','M140','M190','M106','M107','M117'].includes(command)) warnings.push(`${command} on line ${lineIndex + 1}`); continue; }
     const start = { ...pos }, next = { ...pos };
     for (const axis of ['X','Y','Z']) { const value = number(tokens, axis); if (value !== undefined) next[axis.toLowerCase()] = absolute ? value : pos[axis.toLowerCase()] + value; }
@@ -74,15 +96,14 @@ export function reconstructGcode(source, options = {}, progress = () => {}) {
     const isExtruding = eDelta > .00001 && distance > .001 && !shouldSkip();
     if (eDelta < -.00001) stats.retractions++;
     if (isExtruding) {
-      const layerZ = Number(next.z.toFixed(4)); if (!layers.has(layerZ)) layers.set(layerZ, []);
       const points = /^G[23]/.test(command) ? arcPoints(start, next, number(tokens,'I'), number(tokens,'J'), /^G2/.test(command), settings.arcResolution) : [next];
-      let previous = start;
-      for (const point of points) { layers.get(layerZ).push({ a: previous, b: point, tool, feature, feed: feed || 0 }); previous = point; }
-      stats.extrusionDistance += distance; stats.filamentMm += eDelta; updateBounds(start); updateBounds(next);
+      const record = { start, next, points, tool, feature, feed, distance, eDelta, resetEpoch, command };
+      if (modelStarted) appendRecord(record); else pendingStartup.push(record);
     } else stats.travelDistance += distance;
     Object.assign(pos, next);
     if (lineIndex % 8000 === 0) progress(Math.round(lineIndex / lines.length * 70));
   }
+  flushStartup(modelMarkerSeen);
   const meshLayers = [...layers.entries()].sort((a,b) => a[0] - b[0]).map(([z, paths], index) => {
     const vertices = []; for (const path of paths) addBead(vertices, path.a, path.b, settings.width, settings.height); progress(70 + Math.round((index + 1) / Math.max(1, layers.size) * 30));
     return { z, paths, vertices: new Float32Array(vertices) };

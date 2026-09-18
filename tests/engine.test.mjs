@@ -8,5 +8,12 @@ result = rebuild('G91\nM83\nG1 Z.2\nG1 X5 E.3\nG1 X5 E-.8\nG1 X5 E.3\n'); assert
 result = rebuild('G90\nG1 Z.2\nG1 X0 Y0\nG1 X10 E1\nT1\nG1 X20 E1\nG2 X30 Y10 I0 J10 E2\n'); assert.equal(result.stats.toolChanges, 1); assert.ok(result.meshLayers[0].vertices.length > 36);
 result = rebuild(';TYPE:SUPPORT\nG90\nG1 Z.2\nG1 X-10 Y-10\nG1 X10 E1\n'); assert.equal(result.stats.layers, 1); assert.ok(result.stats.min.x < 0);
 result = rebuild('G28\nM900 K.05\nG1 X0 Y0 Z.2\nG1 X10 E1\n'); assert.ok(result.stats.warnings.some(item => item.startsWith('G28')));
+const curaPurge = `;FLAVOR:Marlin\nG90\nM82\nG92 E0\nG1 X5 Y5 Z.2\nG1 X5 Y180 E12\nG92 E0\n;LAYER:0\n;TYPE:WALL-OUTER\nG1 X50 Y50\nG1 X70 Y50 E1\nG1 X70 Y70 E2\nG1 X50 Y70 E3\nG1 X50 Y50 E4\n`;
+result = rebuild(curaPurge); assert.equal(result.stats.startupPurgeSegments, 1); assert.equal(result.stats.startupPurgeExcluded, 1); assert.equal(result.stats.min.x, 50);
+result = reconstructGcode(curaPurge, { ignoreStartupPurge:false, ignoreSkirt:false, ignoreBrim:false, ignoreSupports:false }); assert.equal(result.stats.startupPurgeExcluded, 0); assert.equal(result.stats.min.x, 5);
+const prusaPurge = `G90\nM83\nG92 E0\nG1 X3 Y10 Z.2\nG1 X3 Y190 E8\n;LAYER_CHANGE\n;Z:0.2\n;TYPE:External perimeter\nG1 X40 Y40\nG1 X60 Y40 E.8\nG1 X60 Y60 E.8\nG1 X40 Y60 E.8\n`;
+result = rebuild(prusaPurge); assert.equal(result.stats.startupPurgeExcluded, 1); assert.equal(result.stats.min.x, 40);
+const noCommentModel = `G90\nM82\nG92 E0\nG1 X5 Y5 Z.2\nG1 X55 Y5 E1\nG1 X55 Y55 E2\nG1 X5 Y55 E3\nG1 X5 Y5 E4\n`;
+result = rebuild(noCommentModel); assert.equal(result.stats.startupPurgeExcluded, 0); assert.equal(result.stats.min.x, 5);
 console.log('engine tests passed');
 const bytes = binaryStl(Array.from(rebuild(sampleGcode()).meshLayers[0].vertices)); const view = new DataView(bytes); assert.equal(view.byteLength, 84 + view.getUint32(80, true) * 50); assert.ok(view.getUint32(80, true) > 0); console.log('binary STL test passed');
