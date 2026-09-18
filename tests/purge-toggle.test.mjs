@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = normalize(join(fileURLToPath(new URL('..', import.meta.url))));
 const fixture = fileURLToPath(new URL('./fixtures/creality-startup-purge.gcode', import.meta.url));
+const flashFixture = fileURLToPath(new URL('./fixtures/flash-studio-startup-purge.gcode', import.meta.url));
 const types = { '.css':'text/css', '.js':'text/javascript', '.html':'text/html', '.png':'image/png' };
 const server = http.createServer(async (request, response) => {
   const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname), file = normalize(join(root, pathname === '/' ? 'index.html' : pathname));
@@ -30,5 +31,14 @@ try {
   const includedBounds = await page.locator('#stats').textContent();
   assert.match(includedBounds, /-2\.4, 20\.0, 0\.2/);
   assert.notEqual(excludedBounds, includedBounds);
+  await page.locator('input[name="ignoreStartupPurge"]').check();
+  await page.locator('#file').setInputFiles(flashFixture);
+  await page.waitForFunction(() => document.querySelector('#viewer-state')?.textContent === 'Startup purge line detected: 3 segments excluded.');
+  const flashExcludedBounds = await page.locator('#stats').textContent();
+  assert.match(flashExcludedBounds, /76\.0, 80\.0, 0\.3/);
+  await page.locator('input[name="ignoreStartupPurge"]').uncheck();
+  await page.waitForFunction(() => document.querySelector('#viewer-state')?.textContent === 'Startup purge line detected and included.');
+  const flashIncludedBounds = await page.locator('#stats').textContent();
+  assert.match(flashIncludedBounds, /50\.0, -1\.4, 0\.3/);
   console.log('purge toggle browser test passed');
 } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }

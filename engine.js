@@ -82,7 +82,10 @@ export function reconstructGcode(source, options = {}, progress = () => {}) {
     if (comment) {
       const match = comment.match(/(?:TYPE|FEATURE)\s*:\s*(.+)/i); if (match) feature = match[1].trim();
       /* A feature label is not a model boundary: Creality Print emits ;TYPE:Custom before its startup purge lines. */
-      if (/(?:^|\s)(?:LAYER\s*:\s*0|LAYER_CHANGE|MESH\s*:|OBJECT_ID\s*:|PRINTING\s+OBJECT)/i.test(comment) && !modelStarted) { modelStarted = true; modelMarkerSeen = true; flushStartup(true); }
+      /* Match actual comment markers only. Flash Studio's settings header contains `layer_change_gcode`, which is not a print boundary. */
+      const normalizedComment = comment.toUpperCase();
+      const modelBoundary = normalizedComment === 'LAYER_CHANGE' || /^LAYER\s*:\s*0\s*$/.test(comment) || /^MESH\s*:\s*\S/.test(comment) || /^OBJECT_ID\s*:\s*\S/.test(comment) || /^PRINTING\s+OBJECT\b/.test(comment);
+      if (modelBoundary && !modelStarted) { modelStarted = true; modelMarkerSeen = true; flushStartup(true); }
       const slicer = comment.match(/(?:GENERATED\s+BY|GENERATED WITH|SLICER)\s*[:=]?\s*(.+)/i); if (slicer) stats.slicer = slicer[1].trim();
       const layerHeight = comment.match(/LAYER_HEIGHT\s*[:=]\s*([\d.]+)/i); if (layerHeight) stats.layerHeight = Number(layerHeight[1]);
       const nozzle = comment.match(/NOZZLE_DIAMETER\s*[:=]\s*([\d.]+)/i); if (nozzle) stats.nozzle = Number(nozzle[1]);
