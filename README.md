@@ -1,46 +1,87 @@
+<p align="center">
+  <img src="assets/branding/gcode-rebuilder-logo-original.png" width="180" alt="GCode Rebuilder logo">
+</p>
+
 # GCode Rebuilder
 
-GCode Rebuilder is a privacy-first, browser-based utility that reconstructs FDM extrusion paths as a practical STL mesh. It processes files locally—no G-code is uploaded or persisted.
+Reconstruct deposited FDM G-code paths into downloadable STL geometry, directly in the browser. The resulting STL represents the material paths recorded in the G-code—not the original CAD model from before slicing.
 
-![GCode Rebuilder workspace](docs-preview.png)
+<p>
+  <a href="https://thomasargo.github.io/gcode-rebuilder/"><strong>Launch GCode Rebuilder</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://thomasargo.github.io/"><strong>View Thomas Argo’s Portfolio</strong></a>
+</p>
 
-## Features
+## Contents
 
-- Drag-and-drop `.gcode`, `.gco`, and plain-text G-code.
-- Client-side parser in a Web Worker with progress reporting.
-- G0/G1 movement, G2/G3 I/J arcs, G90/G91 positioning, M82/M83 extrusion modes, G92 resets, retractions, Z layers, and tool changes.
-- Common `TYPE:` / `FEATURE:` slicer comment recognition, including options to omit skirts, brim, supports, and infill.
-- Closed deposited-bead triangles, real-time Three.js preview, orbit/pan/zoom, wireframe, orthographic view, and layer filtering.
-- Binary STL, ASCII STL, and JSON report download.
+- [What it does](#what-it-does)
+- [How to use it](#how-to-use-it)
+- [Current features](#current-features)
+- [Supported files and commands](#supported-files-and-commands)
+- [Export formats](#export-formats)
+- [Privacy](#privacy)
+- [Known limitations](#known-limitations)
+- [Technology](#technology)
+- [Copyright and Use](#copyright-and-use)
 
-## Included 3DBenchy sample
+## What it does
 
-`samples/3dbenchy-sample.gcode` is a bundled, pre-sliced reconstruction demo of the official Creative Tools [single-part 3DBenchy](https://github.com/CreativeTools/3DBenchy/tree/master/Single-part). The original model is CC0/public domain as of 2025. The demonstration slice uses a 0.4 mm nozzle, 0.2 mm layers, one material, standard orientation, no supports, and no startup purge, skirt, or brim deposition. It is sourced from a Creality-maintained Benchy slice and sanitized with `scripts/sanitize-benchy-sample.mjs` to retain only reconstruction-relevant commands.
+GCode Rebuilder reads the deposited extrusion moves in an FDM G-code file and turns them into a practical mesh you can inspect or export. It is useful when you need to review the printable paths in an existing file, inspect layers and bounds, or create a geometry reference from a print file when the original model is unavailable.
 
-The bundled G-code is for browser testing only. It omits printer startup and shutdown sequences and must not be sent directly to a physical printer.
+Everything happens on the device running the browser: the file is parsed, reconstructed, previewed, analyzed, and exported locally. Uploaded G-code is not sent to an application server.
 
-## Important limitation
+Because G-code is already sliced, it describes tool movements rather than the original solid model. Reconstruction is therefore an approximation of deposited paths, not a way to recover the exact pre-sliced CAD or STL.
 
-This rebuild is based on the instructions and extrusion paths left after slicing. It cannot recover the original, pre-sliced STL exactly, and it does not emulate every printer's material behavior. It is best for inspecting a practical deposited-path representation.
+## How to use it
+
+1. Open the [live application](https://thomasargo.github.io/gcode-rebuilder/).
+2. Upload a `.gcode` or `.gco` file, or run the bundled Benchy sample.
+3. Inspect the reconstructed model in the interactive 3D viewer.
+4. Adjust mesh dimensions and filtering settings, then select **Rebuild** when needed.
+5. Inspect layers with the layer-view controls and review the analysis report.
+6. Download reconstructed geometry or the analysis report from **Export Mesh**.
+
+## Current features
+
+- Browser-local G-code parsing in a Web Worker with progress feedback.
+- Reconstruction of deposited extrusion paths into closed-bead mesh geometry.
+- Interactive Three.js viewer with orbit, pan, zoom, camera reset, fullscreen, orthographic view, wireframe mode, model color, and scene-color controls.
+- Complete-model, up-to-selected-layer, and selected-layer viewing with smooth layer-range updates.
+- Bundled 3DBenchy G-code sample for trying the workflow without uploading a file.
+- G-code analysis for layers, dimensions, bounds, detected slicer metadata, nozzle and layer-height metadata, filament estimate, print speed, travel and extrusion distance, retractions, tool changes, command count, and warnings.
+- Mesh settings for bead width, layer height, nozzle, arc resolution, filament diameter, and material density.
+- Optional infill inclusion plus skirt/brim, support, and startup-purge-line filtering.
+- Binary STL, ASCII STL, and JSON analysis-report downloads.
+
+## Supported files and commands
+
+Accepted upload types are `.gcode`, `.gco`, and plain-text G-code files.
+
+The parser handles G0/G1 linear moves; G2/G3 arcs using I/J center offsets; G90/G91 absolute and relative positioning; M82/M83 absolute and relative extrusion; G92 coordinate and extrusion resets; and `T` tool-change commands. It also recognizes common slicer `TYPE:` and `FEATURE:` comments when applying filters.
+
+## Export formats
+
+- **Binary STL** — compact binary STL geometry reconstructed from the deposited paths.
+- **ASCII STL** — text-based STL geometry reconstructed from the same deposited paths.
+- **Report JSON** — the analysis data collected from the file and reconstruction, including dimensions, layer count, bounds, warnings, and detected metadata.
 
 ## Privacy
 
-Files are parsed, analyzed, meshed, previewed, and exported entirely in your browser. No file contents are transmitted by this application.
+File contents remain in the browser. GCode Rebuilder parses, reconstructs, previews, and exports files locally; it does not upload G-code data to an application server.
 
-## Local development
+## Known limitations
 
-This is a dependency-light static web application. Any static server works:
+- Output represents deposited extrusion paths, not the exact original CAD model.
+- Reconstruction quality depends on the commands, comments, and metadata available in the file.
+- Unsupported or unusual slicer commands can affect the reconstructed result or appear as warnings.
+- The mesh is a practical visualization of deposited material and does not simulate every printer, nozzle, or material behavior.
 
-```bash
-python -m http.server 4173
-```
+## Technology
 
-Then visit `http://localhost:4173`. Run the parser checks with `npm test` and `npm run check` (Node 20+).
+JavaScript, Three.js, Web Workers, HTML, and CSS.
 
-## Deployment
+## Copyright and Use
 
-GitHub Actions runs the parser tests then deploys the static files to GitHub Pages. In repository Settings → Pages, select **GitHub Actions** as the source.
+Copyright © 2026 Thomas Argo. All rights reserved. This project and its source code are proprietary. No permission is granted to copy, modify, distribute, sublicense, sell, or use the source code or associated assets without prior written permission from the copyright holder.
 
-## License
-
-[MIT](LICENSE). Three.js is loaded from jsDelivr under its MIT license.
+This project is not open source. No permission is granted to copy, modify, redistribute, sublicense, sell, or reuse the source code or visual assets.
